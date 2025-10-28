@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect } from "react";
+import { createContext, useState, useEffect, useCallback } from "react";
 import axios from "axios";
 
 export const AuthContext = createContext();
@@ -11,30 +11,34 @@ export const api = axios.create({
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
 
-  // Carregar usuário e tokens do localStorage
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
-    const storedAccess = localStorage.getItem("access_token");
-    const storedRefresh = localStorage.getItem("refresh_token");
 
-    if (storedUser && storedAccess && storedRefresh) {
+    if (storedUser && storedUser !== "undefined") {
       try {
         setUser(JSON.parse(storedUser));
       } catch (err) {
         console.error("Erro ao ler usuário do localStorage:", err);
-        localStorage.clear();
+        localStorage.removeItem("user");
         setUser(null);
       }
+    } else {
+      // Se o valor for null ou "undefined"
+      localStorage.removeItem("user");
+      setUser(null);
     }
   }, []);
+
 
   const login = async (email, password) => {
     try {
       const res = await api.post("/login/", { email, password });
+      console.log("Resposta do backend:", res.data);
       localStorage.setItem("access_token", res.data.access);
       localStorage.setItem("refresh_token", res.data.refresh);
       localStorage.setItem("user", JSON.stringify(res.data.user));
       setUser(res.data.user);
+      console.log("Login bem-sucedido:", res.data.user);
       return res.data.user;
     } catch (err) {
       console.error(err.response?.data || err);
@@ -57,7 +61,7 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
-  const refreshToken = async () => {
+  const refreshToken = useCallback(async () => {
     const refresh = localStorage.getItem("refresh_token");
     if (!refresh) throw new Error("No refresh token available");
 
@@ -69,9 +73,8 @@ export const AuthProvider = ({ children }) => {
       logout();
       throw new Error("Sessão expirada. Faça login novamente.");
     }
-  };
+  }, [logout]);
 
-  // Interceptadores Axios
   useEffect(() => {
     const reqInterceptor = api.interceptors.request.use((config) => {
       const token = localStorage.getItem("access_token");
@@ -101,7 +104,7 @@ export const AuthProvider = ({ children }) => {
       api.interceptors.request.eject(reqInterceptor);
       api.interceptors.response.eject(resInterceptor);
     };
-  }, []);
+  }, [refreshToken]);
 
   return (
     <AuthContext.Provider value={{ user, login, logout, register }}>

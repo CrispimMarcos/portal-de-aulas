@@ -11,14 +11,16 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setErro("");
     try {
-      await login(email, senha);
+      const userLogged = await login(email, senha);
+      console.log("Usuário logado:", userLogged);
       navigate("/dashboard");
     } catch (err) {
+      console.error(err);
       setErro(err.message);
     }
   };
+
 
   return (
     <div style={{ maxWidth: 400, margin: "100px auto", textAlign: "center" }}>
